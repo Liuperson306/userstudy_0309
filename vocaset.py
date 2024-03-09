@@ -148,7 +148,7 @@ def get_ans(answer_str):
     elif "Right" in answer_str:
         return "0"
     elif "" in answer_str:
-        return "1"
+        return ""
     
 @st.cache_data
 def play_video(file_name):
@@ -207,7 +207,7 @@ def page(random_num):
         
     for num in range(30):
         # 显示页面内容
-        st.write(f'这是第{num+1+random_num*30}个视频，名称为{file_list[num+random_num*30].rstrip()}')
+        #st.write(f'这是第{num+1+random_num*30}个视频，名称为{file_list[num+random_num*30].rstrip()}')
         st.subheader(fr"Video {num+1}")
         video_bytes = play_video(file_list[num+random_num*30].rstrip())
         st.video(video_bytes)
