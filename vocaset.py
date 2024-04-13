@@ -1,16 +1,13 @@
 import streamlit as st
-import imaplib
 import time
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.application import MIMEApplication
-import email
-from email.header import decode_header
-import numpy as np
 import random
 import poplib
 from email.parser import Parser
+from datetime import datetime, timedelta
 
 @st.cache_data
 def send_email(email, password, array):
@@ -31,7 +28,6 @@ def send_email(email, password, array):
         smtp.login(email, password)
         smtp.sendmail(email, email, msg.as_string())
         smtp.quit()
-        print('提交次数发送成功')
     except smtplib.SMTPException as e:
         print('邮件发送失败，错误信息：', e)
 
@@ -59,8 +55,6 @@ def read_email(myemail, password):
                 for part in email_message.walk():
                     if part.get_content_type() == "text/plain":
                         content = part.get_payload(decode=True).decode(part.get_content_charset())
-                        print("邮件正文内容:")
-                        print(content)
                         found = True
                         break  # 找到满足条件的邮件后及时跳出循环
                 if found:
@@ -98,8 +92,6 @@ def read_email_(myemail, password):
                 for part in email_message.walk():
                     if part.get_content_type() == "text/plain":
                         content = part.get_payload(decode=True).decode(part.get_content_charset())
-                        print("邮件正文内容:")
-                        print(content)
                         found = True
                         break  # 找到满足条件的邮件后及时跳出循环
                 if found:
@@ -112,7 +104,6 @@ def read_email_(myemail, password):
 
     except Exception as e:
         st.error('网络问题，请刷新页面')
-
 
 def instrunction():
     st.subheader("Instructions: ")
@@ -148,7 +139,7 @@ def get_ans(answer_str):
     elif "Right" in answer_str:
         return "0"
     elif "" in answer_str:
-        return ""
+        return "1"
     
 @st.cache_data
 def play_video(file_name):
@@ -156,12 +147,15 @@ def play_video(file_name):
     return video_bytes
 
 @st.cache_data
-def data_collection(email, password, data_face, data_lip, random_num):
+def data_collection(email, password, data_face, data_lip, random_num, array):
     # 发送内容
     data1 = ''.join(str(x) for x in data_face)
     data2 = ''.join(str(x) for x in data_lip)
     string = "face:" + data1 + "\n" + "lip:" + data2
-    localtime = time.strftime(f'%Y-%m-%d %H-%M-%S', time.localtime())
+    localtime = datetime.strptime(time.strftime('%m-%d %H-%M-%S', time.localtime()), '%m-%d %H-%M-%S')
+    localtime += timedelta(hours=8)
+
+    localtime = localtime.strftime('%m-%d %H-%M-%S')
     # 打开文件并指定写模式
     file_name = dataset + ' ' + str(random_num+1) + ' ' + localtime + ".txt"
     file = open(file_name, "w")
@@ -174,7 +168,7 @@ def data_collection(email, password, data_face, data_lip, random_num):
     msg = MIMEMultipart()
     msg['From'] = email
     msg['To'] = email  # 收件人邮箱
-    msg['Subject'] = dataset + ' ' + str(random_num+1) + ' ' + localtime
+    msg['Subject'] = dataset + ' ' + str(random_num+1) + ' ' + str(array[random_num]) + ' ' + localtime
 
     # 邮件正文
     text = MIMEText(string)
@@ -192,13 +186,12 @@ def data_collection(email, password, data_face, data_lip, random_num):
         smtp.login(email, password)
         smtp.sendmail(email, email, msg.as_string())
         smtp.quit()
-        print('数据发送成功')
     except smtplib.SMTPException as e:
         print('邮件发送失败，错误信息：', e)
 
 def page(random_num):
     instrunction()
-    file = open(fr"filenames_VOCASET_after.txt", "r", encoding='utf-8') 
+    file = open(fr"filenames_{dataset}_after.txt", "r", encoding='utf-8') 
     file_list = file.readlines()
     file.close()
 
@@ -215,34 +208,42 @@ def page(random_num):
         st.write("Please answer the following questions, after you watch the video. ")
         QA(data_face, data_lip, num+1)
 
+    st.divider()
+    
     if not st.session_state.button_clicked:
         if st.button("Submit results"):
             if any(x == "" for x in data_face or x == "" for x in data_lip):
                 st.warning("Please answer all questions before submitting the results.")
             if not any(x == "" for x in data_face or x == "" for x in data_lip):
-                st.write('It will take about 10 seconds, please be patient and wait.')
+                st.write('It will take about 10 seconds, please be patient and wait. ')
                 array = read_email_(myemail, password)
-                print('第二次：', array)
                 array[random_num]+=1
-                print('提交：', array)
                 send_email(myemail, password, array)
-                data_collection(myemail, password, data_face, data_lip, random_num)
+                data_collection(myemail, password, data_face, data_lip, random_num, array)
+                st.divider()
+                st.markdown(':blue[Please take a screenshot of the following results.]')
+                localtime = datetime.strptime(time.strftime('%m月%d日 %H时%M分%S秒', time.localtime()), '%m月%d日 %H时%M分%S秒')
+                localtime += timedelta(hours=8)
+
+                localtime = localtime.strftime('%m月%d日 %H时%M分%S秒')
+                st.write("**Time of submission:** ", localtime)
+                st.write("**Your results ID:** ", dataset, " ", str(random_num+1), str(array[random_num]))
                 st.session_state.button_clicked = True 
 
     if st.session_state.button_clicked == True:
         st.cache_data.clear()
         st.success("Successfully submitted the results. Thank you for using it. Now you can exit the system.")
-        
+
+
 if __name__ == '__main__':
     dataset = 'VOCASET' 
     st.set_page_config(page_title="userstudy")
     #st.cache_data.clear() # 初始化
     myemail = st.secrets["my_email"]["email"]  
     password =  st.secrets["my_email"]["password"]
-    random_range = 6 
+    random_range = 6  
     
     array = read_email(myemail, password)
-    print('第一次：', array)
     if all((element == 3 or element > 3) for element in array):
         array = [0] * random_range
 
@@ -265,3 +266,4 @@ if __name__ == '__main__':
 
     random_num = st.session_state.random_num
     page(random_num)
+
